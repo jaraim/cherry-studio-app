@@ -19,10 +19,10 @@ jobs:
         bun-version: latest
         
     - name: 安装依赖项
-      run: bun install  # Bun 自动处理，通常不会有补丁问题
+      run: bun install
       
     - name: 生成数据库
-      run: bun run db:generate  # 或 pnpm db:generate，看项目配置
+      run: npx drizzle-kit generate  # ✅ 正确命令
       
     - name: 构建 MCP Streamable HTTP 包
       run: |
@@ -41,7 +41,7 @@ jobs:
       uses: android-actions/setup-android@v3
       
     - name: 预构建 Android
-      run: bunx expo prebuild -p android  # 或用 npx expo prebuild
+      run: bunx expo prebuild -p android
       
     - name: 构建 APK
       run: |
