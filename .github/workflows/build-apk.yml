@@ -43,17 +43,14 @@ jobs:
     - name: 预构建 Android
       run: bunx expo prebuild -p android
       
-    - name: 配置 Gradle 内存
-      run: |
-        echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -XX:MaxPermSize=512m" >> android/gradle.properties
-        echo "org.gradle.daemon=false" >> android/gradle.properties
-        echo "org.gradle.parallel=false" >> android/gradle.properties
-      
     - name: 构建 APK
+      env:
+        GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+        JAVA_OPTS: "-Xmx6g -XX:MaxMetaspaceSize=512m"
       run: |
         cd android
         chmod +x gradlew
-        ./gradlew assembleRelease -x lint -x lintVitalAnalyzeRelease --no-daemon
+        ./gradlew assembleRelease -x lint -x lintVitalAnalyzeRelease --no-daemon --max-workers=2
         
     - name: 上传 APK
       uses: actions/upload-artifact@v4
