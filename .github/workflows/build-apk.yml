@@ -2,59 +2,54 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:  # 允许手动触发
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: 设置工作
       uses: actions/checkout@v4
       
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: 安装 Bun
+      uses: oven-sh/setup-bun@v1
       with:
-        node-version: '20'
+        bun-version: latest
         
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 8
-        
-    - name: Install dependencies
-      run: pnpm install
+    - name: 安装依赖项
+      run: bun install  # Bun 自动处理，通常不会有补丁问题
       
-    - name: Generate database
-      run: pnpm db:generate
+    - name: 生成数据库
+      run: bun run db:generate  # 或 pnpm db:generate，看项目配置
       
-    - name: Build MCP Streamable HTTP package
+    - name: 构建 MCP Streamable HTTP 包
       run: |
         cd packages/react-native-streamable-http
-        npm install
-        npm run build
+        bun install
+        bun run build
         cd ../..
       
-    - name: Setup Java
+    - name: 安装 Java
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         
-    - name: Setup Android SDK
+    - name: 安装 Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Prebuild Android
-      run: npx expo prebuild -p android
+    - name: 预构建 Android
+      run: bunx expo prebuild -p android  # 或用 npx expo prebuild
       
-    - name: Build APK
+    - name: 构建 APK
       run: |
         cd android
         chmod +x gradlew
         ./gradlew assembleRelease
         
-    - name: Upload APK
+    - name: 上传 APK
       uses: actions/upload-artifact@v4
       with:
         name: app-release
