@@ -1,0 +1,98 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 设置工作
+      uses: actions/checkout@v4
+      
+    - name: 安装 Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+        
+    - name: 安装依赖项
+      run: bun install
+      
+    - name: 生成数据库
+      run: npx drizzle-kit generate
+      
+    - name: 构建 MCP Streamable HTTP 包
+      run: |
+        cd packages/react-native-streamable-http
+        bun install
+        bun run build
+        cd ../..
+      
+    - name: 安装 Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: 安装 Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: 预构建 Android
+      run: bunx expo prebuild -p android
+      
+    - name: 构建 APK
+      env:
+        GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+        JAVA_OPTS: "-Xmx6g -XX:MaxMetaspaceSize=512m"
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleRelease -x lint -x lintVitalAnalyzeRelease --no-daemon --max-workers=2
+        
+    - name: 重命名 APK（添加版本信息）
+      run: |
+        cd android/app/build/outputs/apk/release
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        SHORT_SHA=${{ github.sha }}
+        SHORT_SHA=${SHORT_SHA:0:7}
+        mv app-release.apk "cherry-studio-${TIMESTAMP}-${SHORT_SHA}.apk"
+        echo "APK_NAME=cherry-studio-${TIMESTAMP}-${SHORT_SHA}.apk" >> $GITHUB_ENV
+        echo "TIMESTAMP=${TIMESTAMP}" >> $GITHUB_ENV
+
+    - name: 上传到 Artifacts（保留）
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: android/app/build/outputs/apk/release/*.apk
+        retention-days: 7
+
+    - name: 推送到 Releases（Nightly）
+      uses: softprops/action-gh-release@v2
+      with:
+        repository: jaraim/cherry-studio-app
+        tag_name: nightly
+        name: "Cherry Studio Nightly Build"
+        body: |
+          🍒 Cherry Studio Android 自动构建版本
+          
+          - 构建时间: ${{ env.TIMESTAMP }}
+          - 提交: ${{ github.sha }}
+          - 分支: ${{ github.ref_name }}
+          
+          ### 安装方法
+          下载 APK 文件后，在 Android 设备上直接安装。
+          
+          > ⚠️ 这是开发版本，可能包含未测试的功能。
+        files: android/app/build/outputs/apk/release/*.apk
+        prerelease: true
+        draft: false
+        make_latest: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.CHERRY_STUDIO_TOKEN }}
+
+    - name: 清理
+      if: always()
+      run: rm -rf android/app/build/outputs/apk/release/*.apk
